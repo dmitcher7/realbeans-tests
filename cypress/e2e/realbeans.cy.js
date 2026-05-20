@@ -1,69 +1,92 @@
+
+
 describe('RealBeans Webshop Tests', () => {
-  
-  // VOORBEREIDING: Dit blokje draait automatisch vóór ELKE 'it' test hieronder.
-  // Handig om te onthouden: zo hoeven we de inlogcode niet 5 keer opnieuw te typen!
+
+
+
+  // VOORBEREIDING
   beforeEach(() => {
     cy.visit('https://r1058442-realbeans.myshopify.com')
-    cy.get('input[type="password"]').type('sothow') // Vul het developer wachtwoord in
-    cy.get('form').submit() // Druk op de inlogknop/enter
-  })
-
-  // 1. HOMEPAGE: Check of de startpagina laadt en de juiste elementen bevat
-  it('Homepage: shows intro text and product list', () => {
-    // Kijken of de specifieke introductietekst van Harry daadwerkelijk op de pagina staat
-    cy.contains('Since 1801, RealBeans has roasted premium coffee').should('be.visible')
+    cy.get('input[type="password"]').type('sothow')
+    cy.get('form').submit()
     
-    // Controleren of het grid met producten is geladen. We gebruiken 'exist' zodat 
-    // Cypress alleen in de code hoeft te kijken of het blok bestaat, ook als we niet scrollen.
-    cy.get('.grid, .product-grid, ul').should('exist')
+    // DE FIX: Dwing Cypress om te wachten tot de inlog-actie volledig is verwerkt.
+    // Hij mag pas door naar de tests als hij deze specifieke zin van de homepage ziet.
+    cy.contains('Since 1801, RealBeans has roasted premium coffee').should('be.visible')
   })
 
-  // 2. ABOUT PAGINA: Werkt deze pagina en klopt de geschiedenisles?
-  it('About page: includes the history paragraph', () => {
-    // Direct navigeren naar de specifieke pagina-URL
+
+
+  // 1. The product catalog page shows the correct items you entered.
+  it('1: The product catalog page shows the correct items you entered', () => {
+    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
+    
+    cy.get('.product-grid').within(() => {
+      cy.contains('Blended coffee 5kg').should('exist') 
+      cy.contains('Roasted coffee beans 5kg').should('exist')
+    })
+  })
+
+
+
+  // 2. Sorting products actually changes their order.
+  it('2: Sorting products actually changes their order', () => {
+    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
+    
+    // We slaan de naam van het eerste product op
+    cy.get('.product-grid li').first().invoke('text').then((firstProductBefore) => {
+      
+      // Sorteer op Alfabet (Z-A) in plaats van prijs om volgordeverandering te garanderen
+      cy.get('select[name="sort_by"]').first().select('title-descending', { force: true })
+      
+      // We wachten op de nieuwe URL
+      cy.url().should('include', 'sort_by=title-descending')
+      
+      // Check of de tekst nu anders is dan voor het sorteren
+      cy.get('.product-grid li').first().invoke('text').should('not.eq', firstProductBefore)
+    })
+  })
+
+
+
+  // 3. Product detail pages display the right descriptions, prices, and imagenames.
+  it('3: Product detail pages display the right descriptions, prices, and imagenames', () => {
+    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
+    
+    cy.contains('Blended coffee 5kg').click({ force: true })
+    cy.url().should('include', '/products/')
+    
+    cy.get('.product__title, h1').should('contain.text', 'Blended coffee 5kg')
+    cy.get('.price').invoke('text').should('match', /[0-9]/)
+    cy.get('.product__description, .product-description').invoke('text').should('not.be.empty')
+    
+    // Zoek naar de '/cdn/' map in plaats van het algemene shopify domein
+    cy.get('img').first().should('have.attr', 'src').and('include', '/cdn/')
+  })
+
+
+
+
+  // 4. The homepage's intro text, and product list appear correctly.
+  it('4: The homepage intro text, and product list appear correctly', () => {
+    // We hoeven hier niet meer opnieuw naar de homepage te navigeren of te wachten, 
+    // want dat is al gebeurd in de beforeEach. We checken puur of de lijst bestaat.
+    cy.contains('Since 1801, RealBeans has roasted premium coffee').should('be.visible')
+    cy.get('.grid, .product-grid, ul').find('li').should('have.length.at.least', 1)
+  })
+
+
+
+
+
+
+  // 5. The About page includes the history paragraph.
+  it('5: The About page includes the history paragraph', () => {
     cy.visit('https://r1058442-realbeans.myshopify.com/pages/about')
     cy.contains('From a small Antwerp grocery to a European coffee staple').should('be.visible')
   })
 
-  // 3. CATALOGUS: Zitten er eigenlijk wel producten in onze webshop?
-  it('Product catalog: shows the items', () => {
-    // Shopify plaatst de volledige catalogus standaard altijd op /collections/all
-    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
-    
-    // Pak de lijst met producten en check of er meer dan 0 'kinderen' (items) in zitten
-    cy.get('.product-grid').children().should('have.length.greaterThan', 0)
-  })
-
-  // 4. SORTEREN: Werkt de filter/sorteerfunctie correct?
-  it('Catalog: Sorting by price changes order', () => {
-    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
-    
-    // TRUCJE: Shopify laadt soms 2 dropdown-menu's (voor desktop én mobiel). 
-    // Met .first() pakken we de eerste. Met { force: true } dwingen we Cypress 
-    // om de optie aan te klikken, zelfs als het menu visueel verborgen is.
-    cy.get('select[name="sort_by"]').first().select('price-ascending', { force: true })
-    
-    // Check of de adresbalk verandert. Dit bewijst dat de browser de sortering doorgeeft aan de server!
-    cy.url().should('include', 'sort_by=price-ascending')
-  })
-
-  // 5. DETAILPAGINA: Kunnen we een product aanklikken en de details zien?
-  it('Product detail page: displays right description, price, and image', () => {
-    cy.visit('https://r1058442-realbeans.myshopify.com/collections/all')
-    
-    // TRUCJE: Klik op de allereerste productlink. Ook hier gebruiken we { force: true } 
-    // omdat Shopify vaak onzichtbare CSS-laagjes over linkjes heen legt.
-    cy.get('.product-grid').find('a').first().click({ force: true })
-    
-    // Zitten we nu echt op een productpagina? Controleer de URL structuur
-    cy.url().should('include', '/products/')
-    
-    // Staan de essentiële dingen (titel en prijs) op het scherm?
-    cy.get('.product__title, h1').should('be.visible')
-    cy.get('.price').should('be.visible')
-    
-    // TRUCJE: We gebruiken hier expres 'exist' in plaats van 'be.visible'. 
-    // Anders crasht de test als er toevallig een Shopify cookie-banner over de foto ligt!
-    cy.get('img').first().should('exist')
-  })
 })
+
+
+// test cloud succes

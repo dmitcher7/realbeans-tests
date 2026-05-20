@@ -14,7 +14,7 @@ jobs:
           # Shopify-webshop staat live, dus we recorden direct
           record: true
         env:
-          # Deze sleutel heb je al ingesteld in je GitHub Secrets
+          # Deze sleutel van GitHub Secrets
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
-          # GitHub heeft zijn eigen token nodig voor de actie
+          # GitHub zijn eigen token
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
